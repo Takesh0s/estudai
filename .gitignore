@@ -30,7 +30,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (o .env.example continua versionado)
+.env
 .env*.local
 
 # typescript
@@ -39,3 +40,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local AI assistant settings
+AGENTS.md
+CLAUDE.md
+.claude/
