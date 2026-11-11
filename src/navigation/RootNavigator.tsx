@@ -7,6 +7,7 @@ import { EventFormScreen } from '../screens/app/EventFormScreen';
 import { RemindersScreen } from '../screens/app/RemindersScreen';
 import { SubjectDetailScreen } from '../screens/app/SubjectDetailScreen';
 import { SubjectFormScreen } from '../screens/app/SubjectFormScreen';
+import { TaskFormScreen } from '../screens/app/TaskFormScreen';
 import { fonts, useTheme } from '../theme';
 import { AppTabs } from './AppTabs';
 import { AuthNavigator } from './AuthNavigator';
@@ -58,6 +59,7 @@ export function RootNavigator() {
           <AppStack.Group screenOptions={{ presentation: 'modal' }}>
             <AppStack.Screen name="SubjectForm" component={SubjectFormScreen} />
             <AppStack.Screen name="EventForm" component={EventFormScreen} />
+            <AppStack.Screen name="TaskForm" component={TaskFormScreen} />
           </AppStack.Group>
         </AppStack.Navigator>
       ) : (
