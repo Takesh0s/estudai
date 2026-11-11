@@ -1,8 +1,9 @@
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMemo } from 'react';
-
 import { useAuth } from '../contexts/AuthContext';
+import { SubjectDetailScreen } from '../screens/app/SubjectDetailScreen';
+import { SubjectFormScreen } from '../screens/app/SubjectFormScreen';
 import { fonts, useTheme } from '../theme';
 import { AppTabs } from './AppTabs';
 import { AuthNavigator } from './AuthNavigator';
@@ -48,6 +49,10 @@ export function RootNavigator() {
       {showApp ? (
         <AppStack.Navigator screenOptions={{ headerShown: false }}>
           <AppStack.Screen name="Tabs" component={AppTabs} />
+          <AppStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+          <AppStack.Group screenOptions={{ presentation: 'modal' }}>
+            <AppStack.Screen name="SubjectForm" component={SubjectFormScreen} />
+          </AppStack.Group>
         </AppStack.Navigator>
       ) : (
         <AuthNavigator recovering={isRecovering} />
