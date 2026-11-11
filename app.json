@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Estuda\u00ed",
+    "name": "Estudaí",
     "slug": "estudai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -43,6 +43,12 @@
         "expo-notifications",
         {
           "color": "#1B7A43"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Estudaí usa suas fotos para você escolher a foto de perfil."
         }
       ]
     ]
