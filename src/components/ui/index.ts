@@ -14,5 +14,6 @@ export * from './ModalHeader';
 export * from './Notice';
 export * from './ProgressBar';
 export * from './Screen';
+export * from './SettingsRow';
 export * from './TextField';
 export * from './Toggle';

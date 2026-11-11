@@ -3,11 +3,15 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { CalendarScreen } from '../screens/app/CalendarScreen';
+import { ChangePasswordScreen } from '../screens/app/ChangePasswordScreen';
+import { EditProfileScreen } from '../screens/app/EditProfileScreen';
 import { EventFormScreen } from '../screens/app/EventFormScreen';
+import { HelpScreen } from '../screens/app/HelpScreen';
 import { RemindersScreen } from '../screens/app/RemindersScreen';
 import { SubjectDetailScreen } from '../screens/app/SubjectDetailScreen';
 import { SubjectFormScreen } from '../screens/app/SubjectFormScreen';
 import { TaskFormScreen } from '../screens/app/TaskFormScreen';
+import { TermsScreen } from '../screens/app/TermsScreen';
 import { fonts, useTheme } from '../theme';
 import { AppTabs } from './AppTabs';
 import { AuthNavigator } from './AuthNavigator';
@@ -55,7 +59,11 @@ export function RootNavigator() {
           <AppStack.Screen name="Tabs" component={AppTabs} />
           <AppStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
           <AppStack.Screen name="Calendar" component={CalendarScreen} />
+          <AppStack.Screen name="EditProfile" component={EditProfileScreen} />
           <AppStack.Screen name="Reminders" component={RemindersScreen} />
+          <AppStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+          <AppStack.Screen name="Help" component={HelpScreen} />
+          <AppStack.Screen name="Terms" component={TermsScreen} />
           <AppStack.Group screenOptions={{ presentation: 'modal' }}>
             <AppStack.Screen name="SubjectForm" component={SubjectFormScreen} />
             <AppStack.Screen name="EventForm" component={EventFormScreen} />
