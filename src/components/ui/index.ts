@@ -8,6 +8,7 @@ export * from './Checkbox';
 export * from './Chip';
 export * from './ColorPicker';
 export * from './ConfirmDialog';
+export * from './DateTimeField';
 export * from './EmptyState';
 export * from './ModalHeader';
 export * from './Notice';
