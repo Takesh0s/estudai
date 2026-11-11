@@ -9,7 +9,7 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 ## Sumário
 
 - [Visão geral](#visão-geral)
-- [Checklist da entrega](#checklist-da-entrega)
+- [Status](#status)
 - [Arquitetura](#arquitetura)
 - [Stack](#stack)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -18,6 +18,7 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 - [Banco de dados](#banco-de-dados)
 - [Qualidade](#qualidade)
 - [Fluxo de trabalho](#fluxo-de-trabalho)
+- [Roadmap](#roadmap)
 - [Design](#design)
 - [Equipe](#equipe)
 - [Licença](#licença)
@@ -30,49 +31,18 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 - **Lembretes:** notificações locais antes de provas e trabalhos, com antecedência e horário escolhidos pelo usuário.
 - **Conta:** cadastro, login, recuperação de senha por código, tema claro ou escuro e exclusão da conta com todos os dados.
 
-## Checklist da entrega
+## Status
 
-Entrega em 17/11, com apresentação em 17 ou 24/11. Um item só é marcado quando já está na `develop`.
-
-### Requisitos do trabalho
-
-- [x] App em React Native (Expo SDK 58 com TypeScript)
-- [x] Pelo menos 4 telas interativas: login, cadastro, recuperação de senha (e-mail, código e nova senha) e Perfil
-- [x] Requisição a web service: autenticação e banco do Supabase via HTTPS
-- [ ] Requisição a uma API pública: feriados nacionais da BrasilAPI na Agenda
-- [x] Persistência de dados: PostgreSQL no Supabase e preferências no aparelho com AsyncStorage
-- [ ] Notificação: lembretes locais antes de provas e trabalhos
-- [ ] Finalidade além de mostrar informações: o usuário cadastra matérias, conteúdos, tarefas e eventos
-- [x] Não é app de consulta de filmes ou livros
-- [ ] Todos os tópicos vistos em sala até a apresentação, conferidos com os slides da disciplina
-- [x] Versionado no GitHub seguindo o Git Flow
-
-### Git Flow
-
-- [x] `main` recebe só versões fechadas, cada uma com tag (`v0.1.0`)
-- [x] `develop` integra o trabalho em andamento
-- [x] Cada funcionalidade em uma `feature/*` criada a partir da `develop`
-- [x] Toda mudança entra por pull request, com merge commit para manter o histórico da branch
-- [x] Branches apagadas depois do merge
-- [x] Commits no padrão Conventional Commits, em inglês
-- [x] CI com lint e checagem de tipos em todo push e pull request
-- [ ] `main` e `develop` protegidas no GitHub: sem push direto e com CI verde para o merge
-- [ ] Commits e pull requests das duas pessoas da equipe
-- [ ] Versão de entrega fechada em uma `release/v1.0.0`, aberta a partir da `develop`
-- [ ] Correções depois da entrega em `hotfix/*`, a partir da `main`
-
-### Funcionalidades
-
-- [x] Cadastro, login com "Lembrar login" e saída com confirmação
-- [x] Recuperação de senha por código enviado por e-mail
-- [x] Tema claro e escuro, com a escolha salva no aparelho
-- [x] Banco com RLS em todas as tabelas, perfil criado no cadastro e exclusão de conta
-- [ ] Matérias e conteúdos (`feature/subjects`)
-- [ ] Início: próxima prova, tarefas do dia e próximos dias (`feature/home`)
-- [ ] Agenda, calendário e feriados nacionais (`feature/schedule`)
-- [ ] Lembretes de provas e trabalhos (`feature/notifications`)
-- [ ] Perfil: edição, foto, preferências de lembrete e exclusão de conta (`feature/profile`)
-- [ ] Versão `v1.0.0` publicada
+| Área | Situação |
+| --- | --- |
+| Acesso: login, cadastro, recuperação de senha e saída | Implementado |
+| Tema claro e escuro com preferência salva no aparelho | Implementado |
+| Banco de dados com RLS, perfis e exclusão de conta | Implementado |
+| Matérias e conteúdos | Implementado |
+| Início (próxima prova, tarefas, próximos dias) | Implementado |
+| Agenda, calendário e feriados nacionais (BrasilAPI) | Implementado |
+| Lembretes por notificação local | Implementado |
+| Perfil: edição, foto e preferências de lembrete | Implementado |
 
 ## Arquitetura
 
@@ -94,6 +64,9 @@ Entrega em 17/11, com apresentação em 17 ou 24/11. Um item só é marcado quan
 O app não tem backend próprio: ele conversa direto com o Supabase. Decisões principais:
 
 - **Segurança no banco:** a chave do Supabase que vai dentro do app é pública por definição. Quem impede um usuário de ler ou alterar dados de outro são as políticas de RLS, presentes em todas as tabelas. O schema completo está em [`supabase/schema.sql`](supabase/schema.sql).
+- **Dados em um só lugar:** matérias, conteúdos, tarefas e eventos são carregados uma vez no `DataContext` e as telas derivam o que precisam deles; cada escrita vai primeiro ao Supabase e depois atualiza as listas locais (marcar tarefa e mudar status de conteúdo são otimistas, com rollback em caso de erro).
+- **Lembretes locais:** não há servidor de push. O `DataContext` mantém as notificações agendadas no aparelho (`expo-notifications`) alinhadas aos eventos e às preferências do perfil: a cada mudança, cancela tudo e agenda de novo os próximos avisos (no máximo 60, porque o iOS limita as notificações locais pendentes a 64). Prova usa as preferências de prova; trabalho, atividade e outros usam as de trabalho. O horário do aviso é `dia do evento − antecedência` no horário escolhido.
+- **Feriados:** a BrasilAPI é consultada uma vez por ano e a resposta fica em memória e no AsyncStorage; sem internet, a agenda funciona sem os feriados.
 - **Sessão em um só lugar:** login, cadastro e recuperação de senha ficam no `AuthContext`; as telas não acessam `supabase.auth` diretamente. O `RootNavigator` alterna entre o fluxo de acesso e o app conforme a sessão, então entrar e sair não depende de `navigate()`.
 - **Recuperação por código:** a senha é redefinida com o código de 6 dígitos enviado por e-mail, não pelo link. O link precisaria reabrir o app por deep link, e no Expo Go esse endereço muda junto com o servidor de desenvolvimento.
 - **Perfil pelo banco:** um trigger cria o perfil no cadastro, com o nome informado. Excluir a conta remove o usuário do Auth e, em cascata, tudo o que pertence a ele.
@@ -105,6 +78,7 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 - Expo SDK 58, React Native 0.88, React 19 e TypeScript 6
 - React Navigation 7 (native stack e bottom tabs)
 - Supabase: Auth, PostgreSQL e Storage, via `supabase-js`
+- expo-notifications (lembretes locais), expo-image-picker (foto de perfil), @react-native-community/datetimepicker (data e hora)
 - AsyncStorage, react-native-svg, expo-splash-screen, fonte Inter
 - ESLint (`eslint-config-expo`) e GitHub Actions
 
@@ -119,13 +93,17 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 ├── src/
 │   ├── components/
 │   │   ├── icons/          ícones SVG e logo
-│   │   └── ui/             botões, campos, diálogos e estados vazios
-│   ├── contexts/           sessão e autenticação
-│   ├── lib/                cliente Supabase, tipos do banco e utilitários
+│   │   ├── ui/             botões, campos, cards, chips, diálogos e estados vazios
+│   │   ├── DataGate.tsx    carregamento e erro das abas
+│   │   └── EventCards.tsx  cartões de evento e de feriado
+│   ├── contexts/           sessão e autenticação; dados de estudo
+│   ├── lib/                cliente Supabase, tipos do banco, datas, feriados,
+│   │                       notificações e utilitários
 │   ├── navigation/         navegadores e tipos de rota
 │   ├── screens/
 │   │   ├── auth/           login, cadastro e recuperação de senha
-│   │   └── app/            Início, Matérias, Agenda e Perfil
+│   │   └── app/            Início, Matérias, Agenda, Calendário, Perfil,
+│   │                       formulários e telas de apoio (ajuda, termos, senha)
 │   └── theme/              cores, tipografia, medidas e tema
 └── .github/workflows/      CI
 ```
@@ -192,29 +170,15 @@ O GitHub Actions executa os dois a cada push em `main` e `develop` e em todo pul
 
 ## Fluxo de trabalho
 
-O repositório segue o Git Flow. Ninguém faz commit direto em `main` ou `develop`.
+O repositório segue o Git Flow: `main` guarda as versões entregues, `develop` integra o trabalho em andamento e cada funcionalidade nasce em uma branch `feature/*` a partir de `develop`, voltando por pull request. As mensagens de commit seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/).
 
-| Branch | Sai de | Volta para | Uso |
-| --- | --- | --- | --- |
-| `main` | — | — | Versões entregues, com tag |
-| `develop` | `main` | `main`, via `release/*` | Integração do trabalho em andamento |
-| `feature/<nome>` | `develop` | `develop` | Uma funcionalidade ou ajuste |
-| `release/<versão>` | `develop` | `main` e `develop` | Fechamento de uma versão: só correções |
-| `hotfix/<nome>` | `main` | `main` e `develop` | Correção urgente em versão já entregue |
+## Roadmap
 
-Para começar uma funcionalidade:
-
-```bash
-git checkout develop
-git pull
-git checkout -b feature/<nome>
-```
-
-Antes de abrir o pull request, rode `npm run lint` e `npm run typecheck`. O pull request vai para a `develop`, com o que mudou e como testar, e só entra depois que a CI passa. Use **Create a merge commit** e apague a branch em seguida.
-
-As mensagens de commit seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/), em inglês: `feat(subjects): add subject list screen`, `fix(auth): keep session after password reset`, `docs: update delivery checklist`.
-
-Configure o Git com o e-mail da sua conta do GitHub (`git config user.email`). Assim os commits aparecem no seu perfil e contam como contribuição.
+- [x] Matérias e conteúdos (criação, edição, exclusão e status)
+- [x] Início com próxima prova, tarefas do dia e próximos dias
+- [x] Agenda semanal, calendário mensal e anual e feriados nacionais
+- [x] Lembretes de provas e trabalhos com notificações locais
+- [x] Edição de perfil, foto, preferências de lembrete, ajuda e termos de uso
 
 ## Design
 
