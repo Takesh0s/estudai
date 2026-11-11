@@ -41,7 +41,8 @@ type AuthContextValue = {
   refreshProfile: () => Promise<void>;
   updateProfile: (changes: ProfileChanges) => Promise<void>;
   /** Uploads a local image as the profile photo and saves its public URL. */
-  uploadAvatar: (uri: string) => Promise<void>;
+  /** Receives the picked image as a base64 string (no data: prefix). */
+  uploadAvatar: (base64: string) => Promise<void>;
   /** Deletes the account and everything it owns, then ends the session on this device. */
   deleteAccount: () => Promise<void>;
 };
@@ -51,6 +52,25 @@ type AuthContextValue = {
 const REMEMBER_KEY = '@estudai/remember-login';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function base64ToBytes(base64: string): Uint8Array {
+  const clean = base64.replace(/[^A-Za-z0-9+/]/g, '');
+  const bytes = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let buffer = 0;
+  let bits = 0;
+  let index = 0;
+  for (const char of clean) {
+    buffer = (buffer << 6) | BASE64_ALPHABET.indexOf(char);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes[index++] = (buffer >> bits) & 0xff;
+    }
+  }
+  return bytes;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [initializing, setInitializing] = useState(true);
@@ -202,11 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const uploadAvatar = useCallback(
-    async (uri: string) => {
+    async (base64: string) => {
       if (!userId) throw new Error('No signed-in user.');
       // Storage policies only allow writing inside a folder named after the user.
       const path = `${userId}/avatar.jpg`;
-      const body = await (await fetch(uri)).arrayBuffer();
+      // Reading the picked file with fetch() can yield an empty body on Android,
+      // which uploads a broken 0-byte image. The picker's base64 is reliable.
+      const body = base64ToBytes(base64);
       const { error } = await supabase.storage
         .from('avatars')
         .upload(path, body, { contentType: 'image/jpeg', upsert: true });

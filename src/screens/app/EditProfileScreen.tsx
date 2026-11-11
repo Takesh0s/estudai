@@ -14,6 +14,7 @@ export function EditProfileScreen({ navigation }: AppScreenProps<'EditProfile'>)
   const { profile, session, displayName, updateProfile, uploadAvatar } = useAuth();
   const [name, setName] = useState(displayName);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -27,8 +28,12 @@ export function EditProfileScreen({ navigation }: AppScreenProps<'EditProfile'>)
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
+      base64: true,
     });
-    if (!result.canceled && result.assets.length > 0) setPhotoUri(result.assets[0].uri);
+    if (!result.canceled && result.assets.length > 0) {
+      setPhotoUri(result.assets[0].uri);
+      setPhotoBase64(result.assets[0].base64 ?? null);
+    }
   }
 
   async function handleSave() {
@@ -40,7 +45,10 @@ export function EditProfileScreen({ navigation }: AppScreenProps<'EditProfile'>)
     setFormError(null);
     setSaving(true);
     try {
-      if (photoUri) await uploadAvatar(photoUri);
+      if (photoUri) {
+        if (!photoBase64) throw new Error('The picker did not return the image data.');
+        await uploadAvatar(photoBase64);
+      }
       if (nameChanged) await updateProfile({ full_name: name.trim() });
       Alert.alert('Perfil atualizado', 'Suas alterações foram salvas.', [
         { text: 'OK', onPress: () => navigation.goBack() },
