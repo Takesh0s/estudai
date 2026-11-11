@@ -15,6 +15,7 @@ import type {
   Subject,
   Task,
 } from '../lib/database.types';
+import { syncReminders } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -126,6 +127,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // Keeps the device's scheduled notifications in line with the events and the
+  // reminder preferences. Runs on sign out too (empty lists), which cancels them.
+  useEffect(() => {
+    if (loading) return;
+    syncReminders(events, subjects, profile).catch(() => {});
+  }, [loading, events, subjects, profile]);
 
   const reload = useCallback(async () => {
     if (!userId) return;
