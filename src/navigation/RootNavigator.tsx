@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { RemindersScreen } from '../screens/app/RemindersScreen';
 import { SubjectDetailScreen } from '../screens/app/SubjectDetailScreen';
 import { SubjectFormScreen } from '../screens/app/SubjectFormScreen';
 import { fonts, useTheme } from '../theme';
@@ -50,6 +51,7 @@ export function RootNavigator() {
         <AppStack.Navigator screenOptions={{ headerShown: false }}>
           <AppStack.Screen name="Tabs" component={AppTabs} />
           <AppStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+          <AppStack.Screen name="Reminders" component={RemindersScreen} />
           <AppStack.Group screenOptions={{ presentation: 'modal' }}>
             <AppStack.Screen name="SubjectForm" component={SubjectFormScreen} />
           </AppStack.Group>

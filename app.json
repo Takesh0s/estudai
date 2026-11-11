@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Estudaí",
+    "name": "Estuda\u00ed",
     "slug": "estudai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -37,6 +37,12 @@
             "image": "./assets/splash-icon-dark.png",
             "backgroundColor": "#121714"
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#1B7A43"
         }
       ]
     ]
