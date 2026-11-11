@@ -2,6 +2,8 @@ import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { CalendarScreen } from '../screens/app/CalendarScreen';
+import { EventFormScreen } from '../screens/app/EventFormScreen';
 import { RemindersScreen } from '../screens/app/RemindersScreen';
 import { SubjectDetailScreen } from '../screens/app/SubjectDetailScreen';
 import { SubjectFormScreen } from '../screens/app/SubjectFormScreen';
@@ -51,9 +53,11 @@ export function RootNavigator() {
         <AppStack.Navigator screenOptions={{ headerShown: false }}>
           <AppStack.Screen name="Tabs" component={AppTabs} />
           <AppStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+          <AppStack.Screen name="Calendar" component={CalendarScreen} />
           <AppStack.Screen name="Reminders" component={RemindersScreen} />
           <AppStack.Group screenOptions={{ presentation: 'modal' }}>
             <AppStack.Screen name="SubjectForm" component={SubjectFormScreen} />
+            <AppStack.Screen name="EventForm" component={EventFormScreen} />
           </AppStack.Group>
         </AppStack.Navigator>
       ) : (
