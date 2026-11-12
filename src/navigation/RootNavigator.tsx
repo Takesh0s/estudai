@@ -1,6 +1,12 @@
-import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import {
+  createNavigationContainerRef,
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  type Theme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { CalendarScreen } from '../screens/app/CalendarScreen';
 import { ChangePasswordScreen } from '../screens/app/ChangePasswordScreen';
@@ -16,8 +22,10 @@ import { fonts, useTheme } from '../theme';
 import { AppTabs } from './AppTabs';
 import { AuthNavigator } from './AuthNavigator';
 import type { AppStackParamList } from './types';
+import { useReminderResponses } from './useReminderResponses';
 
 const AppStack = createNativeStackNavigator<AppStackParamList>();
+const navigationRef = createNavigationContainerRef<AppStackParamList>();
 
 /**
  * Renders the auth stack or the app depending on the session, following React
@@ -51,9 +59,11 @@ export function RootNavigator() {
   }, [scheme, colors]);
 
   const showApp = Boolean(session) && !isRecovering;
+  const [navigationReady, setNavigationReady] = useState(false);
+  useReminderResponses(navigationRef, navigationReady && showApp);
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => setNavigationReady(true)}>
       {showApp ? (
         // Android's default push animation varies by OS version and can fade
         // through an empty background; these keep both screens on screen.
