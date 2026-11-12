@@ -9,7 +9,7 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 ## Sumário
 
 - [Visão geral](#visão-geral)
-- [Status](#status)
+- [Checklist da entrega](#checklist-da-entrega)
 - [Arquitetura](#arquitetura)
 - [Stack](#stack)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -18,7 +18,6 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 - [Banco de dados](#banco-de-dados)
 - [Qualidade](#qualidade)
 - [Fluxo de trabalho](#fluxo-de-trabalho)
-- [Roadmap](#roadmap)
 - [Design](#design)
 - [Equipe](#equipe)
 - [Licença](#licença)
@@ -31,18 +30,50 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 - **Lembretes:** notificações locais antes de provas e trabalhos, com antecedência e horário escolhidos pelo usuário.
 - **Conta:** cadastro, login, recuperação de senha por código, tema claro ou escuro e exclusão da conta com todos os dados.
 
-## Status
+## Checklist da entrega
 
-| Área | Situação |
-| --- | --- |
-| Acesso: login, cadastro, recuperação de senha e saída | Implementado |
-| Tema claro e escuro com preferência salva no aparelho | Implementado |
-| Banco de dados com RLS, perfis e exclusão de conta | Implementado |
-| Matérias e conteúdos | Implementado |
-| Início (próxima prova, tarefas, próximos dias) | Implementado |
-| Agenda, calendário e feriados nacionais (BrasilAPI) | Implementado |
-| Lembretes por notificação local | Implementado |
-| Perfil: edição, foto e preferências de lembrete | Implementado |
+Entrega em 17/11, com apresentação em 17 ou 24/11. Um item só é marcado quando já está na `develop`.
+
+### Requisitos do trabalho
+
+- [x] App em React Native (Expo SDK 58 com TypeScript)
+- [x] Pelo menos 4 telas interativas: acesso, Início, Matérias, Agenda, Calendário, Perfil e formulários
+- [x] Requisição a web service: autenticação, banco e storage do Supabase via HTTPS
+- [x] Requisição a uma API pública: feriados nacionais da BrasilAPI na Agenda
+- [x] Persistência de dados: PostgreSQL no Supabase e preferências no aparelho com AsyncStorage
+- [x] Notificação: lembretes locais antes de provas e trabalhos
+- [x] Finalidade além de mostrar informações: o usuário cadastra matérias, conteúdos, tarefas e eventos
+- [x] Não é app de consulta de filmes ou livros
+- [ ] Todos os tópicos vistos em sala até a apresentação, conferidos com os slides da disciplina
+- [x] Versionado no GitHub seguindo o Git Flow
+
+### Git Flow
+
+- [x] `main` recebe só versões fechadas, cada uma com tag (`v0.1.0`, `v0.1.1`)
+- [x] `develop` integra o trabalho em andamento
+- [x] Cada funcionalidade em uma `feature/*` criada a partir da `develop`
+- [x] Toda mudança entra por pull request, com merge commit para manter o histórico da branch
+- [x] Branches apagadas depois do merge
+- [x] Commits no padrão Conventional Commits
+- [x] CI com lint e checagem de tipos em todo push e pull request
+- [x] `main` e `develop` protegidas no GitHub: sem push direto, só merge commit e CI verde para o merge
+- [x] Commits e pull requests das duas pessoas da equipe
+- [x] Versão de documentação fechada em uma `release/v0.1.1`
+- [ ] Versão de entrega fechada em uma `release/v1.0.0`, aberta a partir da `develop`
+- [ ] Correções depois da entrega em `hotfix/*`, a partir da `main`
+
+### Funcionalidades
+
+- [x] Cadastro, login com "Lembrar login" e saída com confirmação
+- [x] Recuperação de senha por código enviado por e-mail
+- [x] Tema claro e escuro, com a escolha salva no aparelho
+- [x] Banco com RLS em todas as tabelas, perfil criado no cadastro e exclusão de conta
+- [x] Matérias e conteúdos (`feature/subjects`)
+- [x] Início: próxima prova, tarefas do dia e próximos dias (`feature/home`)
+- [x] Agenda, calendário e feriados nacionais (`feature/schedule`)
+- [x] Lembretes de provas e trabalhos (`feature/notifications`)
+- [x] Perfil: edição, foto, senha, preferências de lembrete, ajuda, termos e exclusão de conta (`feature/profile`)
+- [ ] Versão `v1.0.0` publicada
 
 ## Arquitetura
 
@@ -170,15 +201,29 @@ O GitHub Actions executa os dois a cada push em `main` e `develop` e em todo pul
 
 ## Fluxo de trabalho
 
-O repositório segue o Git Flow: `main` guarda as versões entregues, `develop` integra o trabalho em andamento e cada funcionalidade nasce em uma branch `feature/*` a partir de `develop`, voltando por pull request. As mensagens de commit seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/).
+O repositório segue o Git Flow. `main` e `develop` são protegidas: ninguém faz push direto nelas, e o merge só é liberado com a CI verde.
 
-## Roadmap
+| Branch | Sai de | Volta para | Uso |
+| --- | --- | --- | --- |
+| `main` | — | — | Versões entregues, com tag |
+| `develop` | `main` | `main`, via `release/*` | Integração do trabalho em andamento |
+| `feature/<nome>` | `develop` | `develop` | Uma funcionalidade ou ajuste |
+| `release/<versão>` | `develop` | `main` e `develop` | Fechamento de uma versão: só correções |
+| `hotfix/<nome>` | `main` | `main` e `develop` | Correção urgente em versão já entregue |
 
-- [x] Matérias e conteúdos (criação, edição, exclusão e status)
-- [x] Início com próxima prova, tarefas do dia e próximos dias
-- [x] Agenda semanal, calendário mensal e anual e feriados nacionais
-- [x] Lembretes de provas e trabalhos com notificações locais
-- [x] Edição de perfil, foto, preferências de lembrete, ajuda e termos de uso
+Para começar uma funcionalidade:
+
+```bash
+git checkout develop
+git pull
+git checkout -b feature/<nome>
+```
+
+Antes de abrir o pull request, rode `npm run lint` e `npm run typecheck`. O pull request vai para a `develop`, com o que mudou e como testar, e só entra depois que a CI passa. Use **Create a merge commit** e apague a branch em seguida.
+
+As mensagens de commit seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/), no formato `tipo(escopo): descrição`: `feat(subjects): add subject list screen`, `fix(auth): keep session after password reset`, `docs: update delivery checklist`.
+
+Configure o Git com o e-mail da sua conta do GitHub (`git config user.email`). Assim os commits aparecem no seu perfil e contam como contribuição.
 
 ## Design
 
