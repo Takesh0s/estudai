@@ -94,6 +94,9 @@ export function RemindersScreen({ navigation }: AppScreenProps<'Reminders'>) {
     setFormError(null);
     setSaving(true);
     try {
+      // Ask before saving: saving triggers the reschedule, which skips everything
+      // while permission is missing and would not run again once it is granted.
+      const granted = exam.enabled || work.enabled ? await ensureNotificationPermission() : true;
       await updateProfile({
         exam_reminder_enabled: exam.enabled,
         exam_reminder_days_before: exam.days,
@@ -103,16 +106,12 @@ export function RemindersScreen({ navigation }: AppScreenProps<'Reminders'>) {
         assignment_reminder_time: dateToTimeString(work.time),
         high_priority_notifications: highPriority,
       });
-      // Saving updates the profile, and the data provider reschedules every notification.
-      if (exam.enabled || work.enabled) {
-        const granted = await ensureNotificationPermission();
-        if (!granted) {
-          Alert.alert(
-            'Notificações desativadas',
-            'As preferências foram salvas, mas o aparelho não vai avisar você. Ative as notificações do Estudaí nas configurações do sistema.',
-          );
-          return;
-        }
+      if (!granted) {
+        Alert.alert(
+          'Notificações desativadas',
+          'As preferências foram salvas, mas o aparelho não vai avisar você. Ative as notificações do Estudaí nas configurações do sistema.',
+        );
+        return;
       }
       navigation.goBack();
     } catch {

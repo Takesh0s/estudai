@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 import type {
   Content,
   ContentStatus,
@@ -133,6 +134,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
     syncReminders(events, subjects, profile).catch(() => {});
+    // Notifications may be turned on in the system settings while the app is in
+    // the background, so reschedule whenever it comes back to the foreground.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncReminders(events, subjects, profile).catch(() => {});
+    });
+    return () => subscription.remove();
   }, [loading, events, subjects, profile]);
 
   const reload = useCallback(async () => {
