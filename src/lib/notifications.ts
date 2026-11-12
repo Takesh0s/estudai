@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import { Platform } from 'react-native';
 import type { Profile, StudyEvent, Subject } from './database.types';
-import { addDays, formatShortDate, formatTime, startOfDay, timeStringToDate } from './dates';
+import { addDays, daysBetween, formatShortDate, formatTime, startOfDay, timeStringToDate } from './dates';
 import { eventStart } from './events';
 import { eventTypeLabels } from './labels';
 
@@ -10,6 +10,20 @@ const CHANNEL_DEFAULT = 'lembretes';
 const CHANNEL_HIGH = 'lembretes-prioridade-alta';
 // iOS keeps at most 64 pending local notifications per app; stay below that.
 const MAX_SCHEDULED = 60;
+
+// Reminders carry two buttons. Category ids may not contain ':' or '-'.
+export const REMINDER_CATEGORY = 'lembrete';
+export const ACTION_SNOOZE = 'adiar';
+export const ACTION_OPEN = 'ver';
+export const SNOOZE_MINUTES = 60;
+
+// Scheduled reminders are rebuilt on every sync; snoozed ones are not, so a
+// change to any event does not wipe a reminder the user postponed.
+const REMINDER_PREFIX = 'event-';
+const SNOOZE_PREFIX = 'snooze-';
+
+/** Data attached to every reminder, read back when the user interacts with it. */
+export type ReminderData = { eventId: string };
 
 const isSupported = Platform.OS !== 'web';
 
@@ -68,6 +82,15 @@ export async function ensureNotificationPermission() {
   return requested.granted;
 }
 
+async function ensureCategory() {
+  // Both buttons open the app: on Android, a button that does not open it is
+  // only handled by a background task, and the tapped notification stays in the tray.
+  await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY, [
+    { identifier: ACTION_SNOOZE, buttonTitle: 'Adiar 1 hora', options: { opensAppToForeground: true } },
+    { identifier: ACTION_OPEN, buttonTitle: 'Ver na agenda', options: { opensAppToForeground: true } },
+  ]);
+}
+
 async function ensureChannels() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_DEFAULT, {
@@ -81,12 +104,42 @@ async function ensureChannels() {
   });
 }
 
-function describeWhen(event: StudyEvent, daysBefore: number) {
+/** When the event happens, worded from the moment the notification is shown. */
+function describeWhen(event: StudyEvent, shownAt: Date) {
   const start = eventStart(event);
   const time = formatTime(start);
-  if (daysBefore === 0) return `Hoje às ${time}`;
-  if (daysBefore === 1) return `Amanhã às ${time}`;
-  return `Em ${daysBefore} dias, ${formatShortDate(start)} às ${time}`;
+  const days = daysBetween(shownAt, start);
+  if (days === 0) return `Hoje às ${time}`;
+  if (days === 1) return `Amanhã às ${time}`;
+  return `Em ${days} dias, ${formatShortDate(start)} às ${time}`;
+}
+
+function reminderContent(
+  event: StudyEvent,
+  subjects: Subject[],
+  shownAt: Date,
+): Notifications.NotificationContentInput {
+  const subjectName = subjects.find((subject) => subject.id === event.subject_id)?.name;
+  const data: ReminderData = { eventId: event.id };
+  return {
+    title: `${eventTypeLabels[event.type]}: ${event.title}`,
+    body: [describeWhen(event, shownAt), subjectName].filter(Boolean).join(' · '),
+    categoryIdentifier: REMINDER_CATEGORY,
+    data,
+  };
+}
+
+function channelFor(profile: Profile | null) {
+  return profile?.high_priority_notifications ? CHANNEL_HIGH : CHANNEL_DEFAULT;
+}
+
+async function cancelScheduledReminders() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const request of scheduled) {
+    if (request.identifier.startsWith(REMINDER_PREFIX)) {
+      await Notifications.cancelScheduledNotificationAsync(request.identifier);
+    }
+  }
 }
 
 // Syncs run one after another: cancelling while another run is still scheduling
@@ -94,9 +147,10 @@ function describeWhen(event: StudyEvent, daysBefore: number) {
 let queue: Promise<void> = Promise.resolve();
 
 /**
- * Makes the device's scheduled notifications match the current events and
- * reminder preferences: cancels everything, then schedules the upcoming ones.
- * It never asks for permission itself (see ensureNotificationPermission).
+ * Makes the device's scheduled reminders match the current events and
+ * reminder preferences: cancels them, then schedules the upcoming ones.
+ * Snoozed reminders are left alone. It never asks for permission itself
+ * (see ensureNotificationPermission).
  */
 export function syncReminders(
   events: StudyEvent[],
@@ -107,14 +161,14 @@ export function syncReminders(
   queue = queue
     .catch(() => {})
     .then(async () => {
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      await cancelScheduledReminders();
       if (!profile) return;
       const permission = await Notifications.getPermissionsAsync();
       if (!permission.granted) return;
       await ensureChannels();
+      await ensureCategory();
 
       const now = new Date();
-      const subjectNames = new Map(subjects.map((subject) => [subject.id, subject.name]));
       const due = events
         .map((event) => ({ event, when: reminderDate(event, profile, now) }))
         .filter((item): item is { event: StudyEvent; when: Date } => item.when !== null)
@@ -122,19 +176,46 @@ export function syncReminders(
         .slice(0, MAX_SCHEDULED);
 
       for (const { event, when } of due) {
-        const daysBefore = prefsFor(event, profile).daysBefore;
-        const subjectName = event.subject_id ? subjectNames.get(event.subject_id) : undefined;
-        const body = [describeWhen(event, daysBefore), subjectName].filter(Boolean).join(' · ');
         await Notifications.scheduleNotificationAsync({
-          identifier: `event-${event.id}`,
-          content: { title: `${eventTypeLabels[event.type]}: ${event.title}`, body },
+          identifier: `${REMINDER_PREFIX}${event.id}`,
+          content: reminderContent(event, subjects, when),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: when,
-            channelId: profile.high_priority_notifications ? CHANNEL_HIGH : CHANNEL_DEFAULT,
+            channelId: channelFor(profile),
           },
         });
       }
     });
   return queue;
+}
+
+/**
+ * Shows the reminder for `event` again in SNOOZE_MINUTES. Returns when it will
+ * show, or null when the event starts before that and there is nothing to postpone.
+ */
+export async function snoozeReminder(
+  event: StudyEvent,
+  subjects: Subject[],
+  profile: Profile | null,
+  now: Date = new Date(),
+): Promise<Date | null> {
+  const when = new Date(now.getTime() + SNOOZE_MINUTES * 60_000);
+  if (eventStart(event).getTime() <= when.getTime()) return null;
+  await Notifications.scheduleNotificationAsync({
+    identifier: `${SNOOZE_PREFIX}${event.id}`,
+    content: reminderContent(event, subjects, when),
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: when,
+      channelId: channelFor(profile),
+    },
+  });
+  return when;
+}
+
+/** The event a reminder belongs to, or null for any other notification. */
+export function reminderEventId(response: Notifications.NotificationResponse) {
+  const data = response.notification.request.content.data as Partial<ReminderData> | null;
+  return typeof data?.eventId === 'string' ? data.eventId : null;
 }
