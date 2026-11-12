@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import * as SystemUI from 'expo-system-ui';
 import { Pressable, Text } from 'react-native';
 
 import { palettes } from '../colors';
 import { ThemeProvider, useTheme } from '../ThemeProvider';
+
+jest.mock('expo-system-ui', () => ({ setBackgroundColorAsync: jest.fn(() => Promise.resolve()) }));
 
 const STORAGE_KEY = '@estudai/theme-preference';
 
@@ -43,6 +46,17 @@ it('switches the palette and saves the choice on the device', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Tema escuro' }));
   expect(screen.getByTestId('probe')).toHaveTextContent(`dark:dark:${palettes.dark.background.app}`);
   await waitFor(async () => expect(await AsyncStorage.getItem(STORAGE_KEY)).toBe('dark'));
+});
+
+it('paints the root view behind the screens with the theme background', async () => {
+  await render(
+    <ThemeProvider>
+      <Probe />
+    </ThemeProvider>,
+  );
+  expect(SystemUI.setBackgroundColorAsync).toHaveBeenLastCalledWith(palettes.light.background.app);
+  await fireEvent.press(screen.getByRole('button', { name: 'Tema escuro' }));
+  expect(SystemUI.setBackgroundColorAsync).toHaveBeenLastCalledWith(palettes.dark.background.app);
 });
 
 it('restores the saved choice on the next launch', async () => {

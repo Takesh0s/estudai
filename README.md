@@ -109,7 +109,7 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 - Expo SDK 58, React Native 0.88, React 19 e TypeScript 6
 - React Navigation 7 (native stack e bottom tabs)
 - Supabase: Auth, PostgreSQL e Storage, via `supabase-js`
-- expo-notifications (lembretes locais), expo-image-picker (foto de perfil), @react-native-community/datetimepicker (data e hora)
+- expo-notifications (lembretes locais), expo-image-picker (foto de perfil), @react-native-community/datetimepicker (data e hora), expo-system-ui (fundo da raiz no tema, sem clarão nas transições)
 - AsyncStorage, react-native-svg, expo-splash-screen, fonte Inter
 - ESLint (`eslint-config-expo`), Jest (`jest-expo`), React Native Testing Library e GitHub Actions
 

@@ -26,6 +26,7 @@ export function AppTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        animation: 'shift',
         tabBarActiveTintColor: colors.brand.primary,
         tabBarInactiveTintColor: colors.text.secondary,
         tabBarStyle: {
