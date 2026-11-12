@@ -18,7 +18,7 @@ export function AuthNavigator({ recovering }: AuthNavigatorProps) {
   return (
     <Stack.Navigator
       initialRouteName={recovering ? 'ResetPassword' : 'Login'}
-      screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+      screenOptions={{ headerShown: false, animation: 'ios_from_right' }}
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />

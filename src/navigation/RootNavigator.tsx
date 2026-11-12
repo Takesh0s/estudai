@@ -55,7 +55,9 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navigationTheme}>
       {showApp ? (
-        <AppStack.Navigator screenOptions={{ headerShown: false }}>
+        // Android's default push animation varies by OS version and can fade
+        // through an empty background; these keep both screens on screen.
+        <AppStack.Navigator screenOptions={{ headerShown: false, animation: 'ios_from_right' }}>
           <AppStack.Screen name="Tabs" component={AppTabs} />
           <AppStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
           <AppStack.Screen name="Calendar" component={CalendarScreen} />
@@ -64,7 +66,7 @@ export function RootNavigator() {
           <AppStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
           <AppStack.Screen name="Help" component={HelpScreen} />
           <AppStack.Screen name="Terms" component={TermsScreen} />
-          <AppStack.Group screenOptions={{ presentation: 'modal' }}>
+          <AppStack.Group screenOptions={{ presentation: 'modal', animation: 'slide_from_bottom' }}>
             <AppStack.Screen name="SubjectForm" component={SubjectFormScreen} />
             <AppStack.Screen name="EventForm" component={EventFormScreen} />
             <AppStack.Screen name="TaskForm" component={TaskFormScreen} />
