@@ -15,5 +15,6 @@ export * from './Notice';
 export * from './ProgressBar';
 export * from './Screen';
 export * from './SettingsRow';
+export * from './StepSlider';
 export * from './TextField';
 export * from './Toggle';
