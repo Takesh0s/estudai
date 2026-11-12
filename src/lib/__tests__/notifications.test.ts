@@ -1,0 +1,179 @@
+import * as Notifications from 'expo-notifications';
+
+import { makeEvent, makeProfile, makeSubject } from '../../test/factories';
+import { hasActiveReminder, reminderDate, syncReminders } from '../notifications';
+
+jest.mock('expo-notifications', () => ({
+  AndroidImportance: { DEFAULT: 3, MAX: 5 },
+  SchedulableTriggerInputTypes: { DATE: 'date' },
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: jest.fn(),
+  requestPermissionsAsync: jest.fn(),
+  setNotificationChannelAsync: jest.fn(),
+  cancelAllScheduledNotificationsAsync: jest.fn(),
+  scheduleNotificationAsync: jest.fn(),
+}));
+
+const mocked = jest.mocked(Notifications);
+
+// Wednesday, 11 Nov 2026, 10:00.
+const now = new Date(2026, 10, 11, 10, 0);
+const at = (day: number, hour: number, minute = 0) => new Date(2026, 10, day, hour, minute).toISOString();
+
+describe('hasActiveReminder', () => {
+  it('needs both the event switch and the profile switch for its type', () => {
+    const profile = makeProfile({ exam_reminder_enabled: false });
+    expect(hasActiveReminder(makeEvent({ type: 'prova' }), profile)).toBe(false);
+    expect(hasActiveReminder(makeEvent({ type: 'trabalho' }), profile)).toBe(true);
+    expect(hasActiveReminder(makeEvent({ reminder_enabled: false }), makeProfile())).toBe(false);
+  });
+
+  it('assumes the reminder is on while the profile is still loading', () => {
+    expect(hasActiveReminder(makeEvent(), null)).toBe(true);
+  });
+});
+
+describe('reminderDate', () => {
+  it('uses the exam settings for exams', () => {
+    // Exam on the 20th; profile: 1 day before at 20:00.
+    const date = reminderDate(makeEvent({ type: 'prova', starts_at: at(20, 9) }), makeProfile(), now);
+    expect(date).toEqual(new Date(2026, 10, 19, 20, 0));
+  });
+
+  it('uses the assignment settings for every other type', () => {
+    // Profile: 2 days before at 18:30.
+    for (const type of ['trabalho', 'atividade', 'outro'] as const) {
+      const date = reminderDate(makeEvent({ type, starts_at: at(20, 23, 59) }), makeProfile(), now);
+      expect(date).toEqual(new Date(2026, 10, 18, 18, 30));
+    }
+  });
+
+  it('fires on the day itself when the lead time is zero', () => {
+    const profile = makeProfile({ exam_reminder_days_before: 0, exam_reminder_time: '07:00:00' });
+    expect(reminderDate(makeEvent({ starts_at: at(12, 9) }), profile, now)).toEqual(new Date(2026, 10, 12, 7, 0));
+  });
+
+  it('crosses month boundaries', () => {
+    const profile = makeProfile({ exam_reminder_days_before: 3 });
+    const date = reminderDate(makeEvent({ starts_at: new Date(2026, 11, 2, 9).toISOString() }), profile, now);
+    expect(date).toEqual(new Date(2026, 10, 29, 20, 0));
+  });
+
+  it('returns null when the reminder time has already passed', () => {
+    // Exam tomorrow; the reminder would have been today at 08:00, before `now`.
+    const profile = makeProfile({ exam_reminder_time: '08:00:00', exam_reminder_days_before: 1 });
+    expect(reminderDate(makeEvent({ starts_at: at(12, 9) }), profile, now)).toBeNull();
+  });
+
+  it('returns null when the reminder is off', () => {
+    expect(reminderDate(makeEvent({ reminder_enabled: false }), makeProfile(), now)).toBeNull();
+  });
+});
+
+describe('syncReminders', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers({ now, doNotFake: ['nextTick', 'setImmediate'] });
+    mocked.getPermissionsAsync.mockResolvedValue({ granted: true } as never);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('cancels and schedules nothing when signed out', async () => {
+    await syncReminders([makeEvent()], [], null);
+    expect(mocked.cancelAllScheduledNotificationsAsync).toHaveBeenCalledTimes(1);
+    expect(mocked.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('schedules nothing without notification permission', async () => {
+    mocked.getPermissionsAsync.mockResolvedValue({ granted: false } as never);
+    await syncReminders([makeEvent({ starts_at: at(20, 9) })], [], makeProfile());
+    expect(mocked.cancelAllScheduledNotificationsAsync).toHaveBeenCalled();
+    expect(mocked.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('schedules each upcoming reminder with a readable message', async () => {
+    const subject = makeSubject({ id: 'calc', name: 'Cálculo' });
+    await syncReminders(
+      [makeEvent({ id: 'p1', title: 'P1', subject_id: 'calc', starts_at: at(20, 9) })],
+      [subject],
+      makeProfile(),
+    );
+
+    expect(mocked.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(mocked.scheduleNotificationAsync).toHaveBeenCalledWith({
+      identifier: 'event-p1',
+      content: { title: 'Prova: P1', body: 'Amanhã às 09:00 · Cálculo' },
+      trigger: { type: 'date', date: new Date(2026, 10, 19, 20, 0), channelId: 'lembretes' },
+    });
+  });
+
+  it('describes the lead time in the message', async () => {
+    const profile = makeProfile({
+      exam_reminder_days_before: 0,
+      exam_reminder_time: '07:00:00',
+      assignment_reminder_days_before: 3,
+    });
+    await syncReminders(
+      [
+        makeEvent({ id: 'today', type: 'prova', starts_at: at(16, 9) }),
+        makeEvent({ id: 'later', type: 'trabalho', title: 'Relatório', starts_at: at(20, 23, 59) }),
+      ],
+      [],
+      profile,
+    );
+
+    const bodies = mocked.scheduleNotificationAsync.mock.calls.map(([request]) => request.content.body);
+    expect(bodies).toEqual(['Hoje às 09:00', 'Em 3 dias, Sex, 20 de nov às 23:59']);
+  });
+
+  it('skips past and disabled reminders and orders the rest by fire time', async () => {
+    await syncReminders(
+      [
+        makeEvent({ id: 'later', starts_at: at(25, 9) }),
+        makeEvent({ id: 'past', starts_at: at(1, 9) }),
+        makeEvent({ id: 'off', starts_at: at(22, 9), reminder_enabled: false }),
+        makeEvent({ id: 'sooner', starts_at: at(15, 9) }),
+      ],
+      [],
+      makeProfile(),
+    );
+
+    const ids = mocked.scheduleNotificationAsync.mock.calls.map(([request]) => request.identifier);
+    expect(ids).toEqual(['event-sooner', 'event-later']);
+  });
+
+  it('uses the high-priority channel when the profile asks for it', async () => {
+    await syncReminders([makeEvent({ starts_at: at(20, 9) })], [], makeProfile({ high_priority_notifications: true }));
+    const [request] = mocked.scheduleNotificationAsync.mock.calls[0];
+    expect(request.trigger).toEqual(expect.objectContaining({ channelId: 'lembretes-prioridade-alta' }));
+  });
+
+  it('keeps below the iOS limit of 64 pending notifications', async () => {
+    const events = Array.from({ length: 80 }, (_, index) =>
+      makeEvent({ id: `e${index}`, starts_at: new Date(2026, 11, 1 + (index % 28), 9).toISOString() }),
+    );
+    await syncReminders(events, [], makeProfile());
+    expect(mocked.scheduleNotificationAsync).toHaveBeenCalledTimes(60);
+  });
+
+  it('runs one sync at a time', async () => {
+    const order: string[] = [];
+    mocked.cancelAllScheduledNotificationsAsync.mockImplementation(async () => {
+      order.push('cancel');
+    });
+    mocked.scheduleNotificationAsync.mockImplementation(async (request) => {
+      order.push(request.identifier ?? '');
+      return request.identifier ?? '';
+    });
+
+    await Promise.all([
+      syncReminders([makeEvent({ id: 'a', starts_at: at(20, 9) })], [], makeProfile()),
+      syncReminders([makeEvent({ id: 'b', starts_at: at(20, 9) })], [], makeProfile()),
+    ]);
+
+    expect(order).toEqual(['cancel', 'event-a', 'cancel', 'event-b']);
+  });
+});
