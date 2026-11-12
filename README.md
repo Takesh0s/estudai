@@ -55,7 +55,7 @@ Entrega em 17/11, com apresentação em 17 ou 24/11. Um item só é marcado quan
 - [x] Toda mudança entra por pull request, com merge commit para manter o histórico da branch
 - [x] Branches apagadas depois do merge
 - [x] Commits no padrão Conventional Commits
-- [x] CI com lint e checagem de tipos em todo push e pull request
+- [x] CI com lint, checagem de tipos e testes automatizados em todo push e pull request
 - [x] `main` e `develop` protegidas no GitHub: sem push direto, só merge commit e CI verde para o merge
 - [x] Commits e pull requests das duas pessoas da equipe
 - [x] Versão de documentação fechada em uma `release/v0.1.1`
@@ -111,7 +111,7 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 - Supabase: Auth, PostgreSQL e Storage, via `supabase-js`
 - expo-notifications (lembretes locais), expo-image-picker (foto de perfil), @react-native-community/datetimepicker (data e hora)
 - AsyncStorage, react-native-svg, expo-splash-screen, fonte Inter
-- ESLint (`eslint-config-expo`) e GitHub Actions
+- ESLint (`eslint-config-expo`), Jest (`jest-expo`), React Native Testing Library e GitHub Actions
 
 ## Estrutura do repositório
 
@@ -195,9 +195,20 @@ As fotos de perfil ficam no bucket `avatars`, em uma pasta por usuário. Os tipo
 ```bash
 npm run lint
 npm run typecheck
+npm test
 ```
 
-O GitHub Actions executa os dois a cada push em `main` e `develop` e em todo pull request.
+O GitHub Actions executa os três a cada push em `main` e `develop` e em todo pull request. Os testes rodam com Node.js 22.13 ou mais novo.
+
+Os testes ficam em pastas `__tests__`, ao lado do código que testam:
+
+| Onde | O que cobre |
+| --- | --- |
+| `src/lib/__tests__` | Datas e calendário, agrupamento e urgência de eventos, rótulos, mensagens de erro do login, cache dos feriados da BrasilAPI e agendamento dos lembretes |
+| `src/components/ui/__tests__` | Botão, campo de texto, checkbox, diálogo de confirmação, estado vazio, chip, seletor de cor, barra de progresso e linha de configuração |
+| `src/theme/__tests__` | Troca de tema e preferência salva no aparelho |
+
+Rede e notificações são simuladas, então os testes não dependem de internet nem de celular.
 
 ## Fluxo de trabalho
 
@@ -219,7 +230,7 @@ git pull
 git checkout -b feature/<nome>
 ```
 
-Antes de abrir o pull request, rode `npm run lint` e `npm run typecheck`. O pull request vai para a `develop`, com o que mudou e como testar, e só entra depois que a CI passa. Use **Create a merge commit** e apague a branch em seguida.
+Antes de abrir o pull request, rode `npm run lint`, `npm run typecheck` e `npm test`. O pull request vai para a `develop`, com o que mudou e como testar, e só entra depois que a CI passa. Use **Create a merge commit** e apague a branch em seguida.
 
 As mensagens de commit seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/), no formato `tipo(escopo): descrição`: `feat(subjects): add subject list screen`, `fix(auth): keep session after password reset`, `docs: update delivery checklist`.
 
