@@ -13,6 +13,7 @@ export function ProgressBar({ value, color, height = 8 }: ProgressBarProps) {
   const clamped = Math.min(1, Math.max(0, value));
   return (
     <View
+      accessible
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped * 100) }}
       style={[styles.track, { height, backgroundColor: colors.border.default }]}
