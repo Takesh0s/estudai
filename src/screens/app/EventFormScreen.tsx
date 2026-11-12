@@ -78,6 +78,9 @@ export function EventFormScreen({ navigation, route }: AppScreenProps<'EventForm
     setFormError(null);
     setSaving(true);
     try {
+      // Ask before saving: saving triggers the reschedule, which skips everything
+      // while permission is missing and would not run again once it is granted.
+      const granted = reminder ? await ensureNotificationPermission() : true;
       const input = {
         type,
         title: title.trim(),
@@ -88,14 +91,11 @@ export function EventFormScreen({ navigation, route }: AppScreenProps<'EventForm
       if (existing) await updateEvent(existing.id, input);
       else await addEvent(input);
 
-      if (reminder) {
-        const granted = await ensureNotificationPermission();
-        if (!granted) {
-          Alert.alert(
-            'Notificações desativadas',
-            'O evento foi salvo, mas o aparelho não vai avisar você. Ative as notificações do Estudaí nas configurações do sistema.',
-          );
-        }
+      if (!granted) {
+        Alert.alert(
+          'Notificações desativadas',
+          'O evento foi salvo, mas o aparelho não vai avisar você. Ative as notificações do Estudaí nas configurações do sistema.',
+        );
       }
       navigation.goBack();
     } catch {
