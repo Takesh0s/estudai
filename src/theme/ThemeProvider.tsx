@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SystemUI from 'expo-system-ui';
 import {
   createContext,
   useCallback,
@@ -50,6 +51,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const scheme: ColorScheme =
     preference === 'system' ? (systemScheme === 'dark' ? 'dark' : 'light') : preference;
+
+  // The root view sits behind every screen and shows through during
+  // transitions; matching it to the theme avoids a white or black flash.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(palettes[scheme].background.app).catch(() => {});
+  }, [scheme]);
 
   const value = useMemo(
     () => ({ scheme, colors: palettes[scheme], preference, setPreference }),
