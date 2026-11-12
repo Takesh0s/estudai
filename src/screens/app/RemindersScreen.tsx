@@ -5,10 +5,10 @@ import {
   BackButton,
   Button,
   Card,
-  Chip,
   DateTimeField,
   Notice,
   Screen,
+  StepSlider,
   Toggle,
 } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,7 +18,8 @@ import { ensureNotificationPermission } from '../../lib/notifications';
 import type { AppScreenProps } from '../../navigation/types';
 import { spacing } from '../../theme';
 
-const DAY_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7];
+// Matches the check constraint on the *_days_before columns in schema.sql.
+const MAX_DAYS_BEFORE = 7;
 
 type Draft = { enabled: boolean; days: number; time: Date };
 
@@ -47,20 +48,14 @@ function ReminderCard({ title, description, draft, onChange }: ReminderCardProps
       </View>
       {draft.enabled ? (
         <>
-          <View style={styles.group}>
-            <AppText variant="label">Avisar</AppText>
-            <View style={styles.chipRow}>
-              {DAY_OPTIONS.map((days) => (
-                <Chip
-                  key={days}
-                  size="small"
-                  label={daysBeforeLabel(days)}
-                  selected={draft.days === days}
-                  onPress={() => onChange({ ...draft, days })}
-                />
-              ))}
-            </View>
-          </View>
+          <StepSlider
+            label="Avisar"
+            value={draft.days}
+            min={0}
+            max={MAX_DAYS_BEFORE}
+            formatValue={daysBeforeLabel}
+            onChange={(days) => onChange({ ...draft, days })}
+          />
           <DateTimeField
             label="Horário do aviso"
             mode="time"
@@ -176,6 +171,4 @@ const styles = StyleSheet.create({
   header: { gap: spacing.sm },
   card: { gap: spacing.lg },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  group: { gap: spacing.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
