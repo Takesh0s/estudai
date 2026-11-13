@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { DataGate } from '../../components/DataGate';
 import { AgendaEventCard, HolidayCard } from '../../components/EventCards';
+import { CalendarMonthIcon } from '../../components/icons/CalendarMonthIcon';
 import { Icon } from '../../components/icons/Icon';
 import { AddButton, AppText, EmptyState, Screen } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,14 +63,14 @@ export function ScheduleScreen({ navigation, route }: TabScreenProps<'Schedule'>
         </AppText>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Abrir calendário"
+          accessibilityLabel={`Abrir calendário de ${formatMonthYear(selected)}`}
           onPress={() => navigation.navigate('Calendar', { date: selectedKey })}
           style={[
             styles.calendarButton,
             { backgroundColor: colors.background.surface, borderColor: colors.border.default },
           ]}
         >
-          <Icon name="calendarioMes" size={28} color={colors.text.link} />
+          <CalendarMonthIcon month={selected.getMonth() + 1} size={28} color={colors.text.link} />
         </Pressable>
       </View>
 
