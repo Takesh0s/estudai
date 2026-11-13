@@ -40,11 +40,11 @@ Entrega em 17/11, com apresentação em 17 ou 24/11. Um item só é marcado quan
 - [x] Pelo menos 4 telas interativas: acesso, Início, Matérias, Agenda, Calendário, Perfil e formulários
 - [x] Requisição a web service: autenticação, banco e storage do Supabase via HTTPS
 - [x] Requisição a uma API pública: feriados nacionais da BrasilAPI na Agenda
-- [x] Persistência de dados: PostgreSQL no Supabase e preferências no aparelho com AsyncStorage
+- [x] Persistência de dados conforme o tipo de dado: PostgreSQL no Supabase (dados compartilhados), SQLite (cache dos feriados), SecureStore (token da sessão) e AsyncStorage (preferências)
 - [x] Notificação: lembretes locais antes e na hora de provas e trabalhos, com os botões "Adiar 1 hora" e "Ver na agenda"
 - [x] Finalidade além de mostrar informações: o usuário cadastra matérias, conteúdos, tarefas e eventos
 - [x] Não é app de consulta de filmes ou livros
-- [ ] Todos os tópicos vistos em sala até a apresentação, conferidos com os slides da disciplina
+- [x] Todos os tópicos vistos em sala até a apresentação, conferidos com os slides da disciplina
 - [x] Versionado no GitHub seguindo o Git Flow
 
 ### Git Flow
@@ -97,8 +97,9 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 - **Segurança no banco:** a chave do Supabase que vai dentro do app é pública por definição. Quem impede um usuário de ler ou alterar dados de outro são as políticas de RLS, presentes em todas as tabelas. O schema completo está em [`supabase/schema.sql`](supabase/schema.sql).
 - **Dados em um só lugar:** matérias, conteúdos, tarefas e eventos são carregados uma vez no `DataContext` e as telas derivam o que precisam deles; cada escrita vai primeiro ao Supabase e depois atualiza as listas locais (marcar tarefa e mudar status de conteúdo são otimistas, com rollback em caso de erro).
 - **Lembretes locais:** não há servidor de push. O `DataContext` mantém as notificações agendadas no aparelho (`expo-notifications`) alinhadas aos eventos e às preferências do perfil: a cada mudança, cancela os avisos agendados e agenda de novo os próximos (no máximo 60, porque o iOS limita as notificações locais pendentes a 64). Prova usa as preferências de prova; trabalho, atividade e outros usam as de trabalho. Cada evento tem dois avisos: o antecipado, em `dia do evento − antecedência` no horário escolhido (ignorado se cairia depois do início), e o da hora do evento, só com o botão "Ver na agenda". Os botões da notificação abrem o app: "Adiar 1 hora" agenda uma cópia do aviso (que a sincronização não apaga) e "Ver na agenda", assim como o toque na notificação, abre a Agenda no dia do evento (`useReminderResponses`).
-- **Feriados:** a BrasilAPI é consultada uma vez por ano e a resposta fica em memória e no AsyncStorage; sem internet, a agenda funciona sem os feriados.
+- **Feriados:** a BrasilAPI é consultada uma vez por ano e a resposta fica em memória e em uma tabela SQLite (`expo-sqlite`), lida por ano; sem internet, a agenda funciona sem os feriados.
 - **Sessão em um só lugar:** login, cadastro e recuperação de senha ficam no `AuthContext`; as telas não acessam `supabase.auth` diretamente. O `RootNavigator` alterna entre o fluxo de acesso e o app conforme a sessão, então entrar e sair não depende de `navigate()`.
+- **Token no SecureStore:** a sessão do Supabase (tokens de acesso e de renovação) é uma credencial, então fica no `expo-secure-store` (Keychain no iOS, Keystore no Android), dividida em partes porque o SecureStore limita o tamanho de cada valor. Sessões salvas por versões antigas no AsyncStorage são migradas na primeira leitura. Tema e "lembrar login" continuam no AsyncStorage, por serem preferências simples. No web, sem SecureStore, a sessão fica no AsyncStorage e os feriados só em memória.
 - **Recuperação por código:** a senha é redefinida com o código de 6 dígitos enviado por e-mail, não pelo link. O link precisaria reabrir o app por deep link, e no Expo Go esse endereço muda junto com o servidor de desenvolvimento.
 - **Perfil pelo banco:** um trigger cria o perfil no cadastro, com o nome informado. Excluir a conta remove o usuário do Auth e, em cascata, tudo o que pertence a ele.
 - **Tema por tokens:** `src/theme/colors.ts` espelha as variáveis de cor do Figma. As telas leem as cores do tema, e por isso o modo escuro não exige nenhuma condição nelas.
@@ -108,9 +109,9 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 
 - Expo SDK 58, React Native 0.88, React 19 e TypeScript 6
 - React Navigation 7 (native stack e bottom tabs)
-- Supabase: Auth, PostgreSQL e Storage, via `supabase-js`
+- Supabase: Auth, PostgreSQL e Storage, via `supabase-js`, com a sessão no expo-secure-store
 - expo-notifications (lembretes locais), expo-image-picker (foto de perfil), @react-native-community/datetimepicker (data e hora), expo-system-ui (fundo da raiz no tema, sem clarão nas transições)
-- AsyncStorage, react-native-svg, expo-splash-screen, fonte Inter
+- AsyncStorage (preferências), expo-sqlite (cache dos feriados), react-native-svg, expo-splash-screen, fonte Inter
 - ESLint (`eslint-config-expo`), Jest (`jest-expo`), React Native Testing Library e GitHub Actions
 
 ## Estrutura do repositório
@@ -204,7 +205,7 @@ Os testes ficam em pastas `__tests__`, ao lado do código que testam:
 
 | Onde | O que cobre |
 | --- | --- |
-| `src/lib/__tests__` | Datas e calendário, agrupamento e urgência de eventos, rótulos, mensagens de erro do login, cache dos feriados da BrasilAPI, agendamento e adiamento dos lembretes |
+| `src/lib/__tests__` | Datas e calendário, agrupamento e urgência de eventos, rótulos, mensagens de erro do login, cache dos feriados da BrasilAPI em SQLite, sessão no SecureStore, agendamento e adiamento dos lembretes |
 | `src/navigation/__tests__` | Resposta aos botões da notificação: adiar, abrir a agenda no dia do evento e tratar cada toque uma vez só |
 | `src/components/ui/__tests__` | Botão, campo de texto, checkbox, diálogo de confirmação, estado vazio, chip, seletor de cor, slider, barra de progresso e linha de configuração |
 | `src/theme/__tests__` | Troca de tema e preferência salva no aparelho |
