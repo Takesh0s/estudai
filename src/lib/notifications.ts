@@ -11,8 +11,10 @@ const CHANNEL_HIGH = 'lembretes-prioridade-alta';
 // iOS keeps at most 64 pending local notifications per app; stay below that.
 const MAX_SCHEDULED = 60;
 
-// Reminders carry two buttons. Category ids may not contain ':' or '-'.
+// Advance reminders carry two buttons; the one at the event time only opens it,
+// since there is nothing left to postpone. Category ids may not contain ':' or '-'.
 export const REMINDER_CATEGORY = 'lembrete';
+export const START_CATEGORY = 'lembreteagora';
 export const ACTION_SNOOZE = 'adiar';
 export const ACTION_OPEN = 'ver';
 export const SNOOZE_MINUTES = 60;
@@ -64,13 +66,25 @@ export function hasActiveReminder(event: StudyEvent, profile: Profile | null) {
   return prefsFor(event, profile).enabled;
 }
 
-/** When the notification for `event` should fire, or null if it is off or already past. */
+/**
+ * When the advance reminder for `event` should fire: the chosen number of days
+ * before, at the chosen time. Null when it is off, already past, or would only
+ * fire once the event has started (the reminder at the event time covers that).
+ */
 export function reminderDate(event: StudyEvent, profile: Profile, now: Date = new Date()) {
   if (!hasActiveReminder(event, profile)) return null;
   const prefs = prefsFor(event, profile);
-  const day = addDays(startOfDay(eventStart(event)), -prefs.daysBefore);
+  const start = eventStart(event);
+  const day = addDays(startOfDay(start), -prefs.daysBefore);
   const when = timeStringToDate(prefs.time, day);
-  return when.getTime() > now.getTime() ? when : null;
+  return when.getTime() > now.getTime() && when.getTime() < start.getTime() ? when : null;
+}
+
+/** When the reminder at the event time should fire, or null if it is off or already past. */
+export function startReminderDate(event: StudyEvent, profile: Profile, now: Date = new Date()) {
+  if (!hasActiveReminder(event, profile)) return null;
+  const start = eventStart(event);
+  return start.getTime() > now.getTime() ? start : null;
 }
 
 export async function ensureNotificationPermission() {
@@ -83,25 +97,36 @@ export async function ensureNotificationPermission() {
 }
 
 async function ensureCategory() {
-  // Both buttons open the app: on Android, a button that does not open it is
+  // Every button opens the app: on Android, a button that does not open it is
   // only handled by a background task, and the tapped notification stays in the tray.
+  const open = { identifier: ACTION_OPEN, buttonTitle: 'Ver na agenda', options: { opensAppToForeground: true } };
   await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY, [
     { identifier: ACTION_SNOOZE, buttonTitle: 'Adiar 1 hora', options: { opensAppToForeground: true } },
-    { identifier: ACTION_OPEN, buttonTitle: 'Ver na agenda', options: { opensAppToForeground: true } },
+    open,
   ]);
+  await Notifications.setNotificationCategoryAsync(START_CATEGORY, [open]);
 }
+
+// Android channels created so far. A reminder only names a channel that exists;
+// otherwise Android shows it on the default one rather than dropping it.
+const readyChannels = new Set<string>();
 
 async function ensureChannels() {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(CHANNEL_DEFAULT, {
-    name: 'Lembretes',
-    importance: AndroidImportance.DEFAULT,
-  });
-  await Notifications.setNotificationChannelAsync(CHANNEL_HIGH, {
-    name: 'Lembretes (prioridade alta)',
-    importance: AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-  });
+  const channels: [string, Notifications.NotificationChannelInput][] = [
+    [CHANNEL_DEFAULT, { name: 'Lembretes', importance: AndroidImportance.DEFAULT }],
+    [CHANNEL_HIGH, { name: 'Lembretes (prioridade alta)', importance: AndroidImportance.MAX, enableVibrate: true }],
+  ];
+  for (const [id, options] of channels) {
+    try {
+      await Notifications.setNotificationChannelAsync(id, options);
+      readyChannels.add(id);
+    } catch (error) {
+      // Expo Go 58 on Android rejects this call on some devices; the reminders
+      // must still go out, so they fall back to the default channel.
+      console.warn(`[reminders] could not create the "${id}" notification channel`, error);
+    }
+  }
 }
 
 /** When the event happens, worded from the moment the notification is shown. */
@@ -114,23 +139,29 @@ function describeWhen(event: StudyEvent, shownAt: Date) {
   return `Em ${days} dias, ${formatShortDate(start)} às ${time}`;
 }
 
+type ReminderKind = 'advance' | 'start';
+
 function reminderContent(
   event: StudyEvent,
   subjects: Subject[],
   shownAt: Date,
+  kind: ReminderKind = 'advance',
 ): Notifications.NotificationContentInput {
   const subjectName = subjects.find((subject) => subject.id === event.subject_id)?.name;
+  const when = kind === 'start' ? `Agora, às ${formatTime(eventStart(event))}` : describeWhen(event, shownAt);
   const data: ReminderData = { eventId: event.id };
   return {
     title: `${eventTypeLabels[event.type]}: ${event.title}`,
-    body: [describeWhen(event, shownAt), subjectName].filter(Boolean).join(' · '),
-    categoryIdentifier: REMINDER_CATEGORY,
+    body: [when, subjectName].filter(Boolean).join(' · '),
+    categoryIdentifier: kind === 'start' ? START_CATEGORY : REMINDER_CATEGORY,
     data,
   };
 }
 
-function channelFor(profile: Profile | null) {
-  return profile?.high_priority_notifications ? CHANNEL_HIGH : CHANNEL_DEFAULT;
+/** Trigger fields that pick the channel for `profile`, empty when that channel could not be created. */
+function channelFor(profile: Profile | null): { channelId?: string } {
+  const id = profile?.high_priority_notifications ? CHANNEL_HIGH : CHANNEL_DEFAULT;
+  return Platform.OS !== 'android' || readyChannels.has(id) ? { channelId: id } : {};
 }
 
 async function cancelScheduledReminders() {
@@ -148,7 +179,8 @@ let queue: Promise<void> = Promise.resolve();
 
 /**
  * Makes the device's scheduled reminders match the current events and
- * reminder preferences: cancels them, then schedules the upcoming ones.
+ * reminder preferences: cancels them, then schedules the upcoming ones, an
+ * advance reminder and one at the event time for each event.
  * Snoozed reminders are left alone. It never asks for permission itself
  * (see ensureNotificationPermission).
  */
@@ -166,28 +198,78 @@ export function syncReminders(
       const permission = await Notifications.getPermissionsAsync();
       if (!permission.granted) return;
       await ensureChannels();
-      await ensureCategory();
+      try {
+        await ensureCategory();
+      } catch (error) {
+        // Without the buttons the reminders still work, so never skip scheduling over it.
+        console.warn('[reminders] could not register the notification buttons', error);
+      }
 
       const now = new Date();
       const due = events
-        .map((event) => ({ event, when: reminderDate(event, profile, now) }))
-        .filter((item): item is { event: StudyEvent; when: Date } => item.when !== null)
+        .flatMap((event) => [
+          { event, kind: 'advance' as const, when: reminderDate(event, profile, now) },
+          { event, kind: 'start' as const, when: startReminderDate(event, profile, now) },
+        ])
+        .filter((item): item is { event: StudyEvent; kind: ReminderKind; when: Date } => item.when !== null)
         .sort((a, b) => a.when.getTime() - b.when.getTime())
         .slice(0, MAX_SCHEDULED);
 
-      for (const { event, when } of due) {
+      for (const { event, kind, when } of due) {
         await Notifications.scheduleNotificationAsync({
-          identifier: `${REMINDER_PREFIX}${event.id}`,
-          content: reminderContent(event, subjects, when),
+          identifier: `${REMINDER_PREFIX}${event.id}${kind === 'start' ? '-start' : ''}`,
+          content: reminderContent(event, subjects, when, kind),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: when,
-            channelId: channelFor(profile),
+            ...channelFor(profile),
           },
         });
       }
     });
   return queue;
+}
+
+/** Result of sendTestReminder, shown to the user so they can tell what is failing. */
+export type TestReminderResult = { granted: boolean; upcoming: number };
+
+/**
+ * Shows a sample reminder right away and another in 10 seconds through the same
+ * channel and buttons as the real ones. The first checks that notifications are
+ * displayed; the second, that scheduled ones fire. Also reports how many event
+ * reminders are scheduled on the device.
+ */
+export async function sendTestReminder(profile: Profile | null): Promise<TestReminderResult> {
+  if (!isSupported) return { granted: false, upcoming: 0 };
+  const granted = await ensureNotificationPermission();
+  if (!granted) return { granted, upcoming: 0 };
+  await ensureChannels();
+  await ensureCategory().catch(() => {});
+
+  const channel = channelFor(profile);
+  const content: Notifications.NotificationContentInput = {
+    title: 'Lembrete de teste',
+    body: 'É assim que o Estudaí avisa das suas provas e trabalhos.',
+    categoryIdentifier: REMINDER_CATEGORY,
+  };
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'test-now',
+    content,
+    trigger: channel.channelId ? { channelId: channel.channelId } : null,
+  });
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'test-later',
+    content: { ...content, body: 'Este chegou 10 segundos depois: os avisos agendados estão funcionando.' },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(Date.now() + 10_000),
+      ...channel,
+    },
+  });
+
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const upcoming = scheduled.filter((request) => request.identifier.startsWith(REMINDER_PREFIX)).length;
+  return { granted, upcoming };
 }
 
 /**
@@ -208,7 +290,7 @@ export async function snoozeReminder(
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: when,
-      channelId: channelFor(profile),
+      ...channelFor(profile),
     },
   });
   return when;

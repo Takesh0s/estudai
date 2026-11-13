@@ -27,7 +27,7 @@ Trabalho final da disciplina Programação de App (Engenharia de Software, UCB, 
 - **Matérias:** cada matéria do semestre reúne seus conteúdos, marcados como *a estudar*, *estudando* ou *revisado*, e mostra o progresso de revisão.
 - **Início:** a próxima prova, as tarefas do dia e o que vem nos próximos dias.
 - **Agenda:** visão semanal e calendário mensal e anual com provas, trabalhos e outras datas.
-- **Lembretes:** notificações locais antes de provas e trabalhos, com antecedência e horário escolhidos pelo usuário. Na própria notificação, o usuário adia o aviso em 1 hora ou abre o dia do evento na agenda.
+- **Lembretes:** duas notificações locais por evento: uma antes, com antecedência e horário escolhidos pelo usuário, e outra na hora do evento. Na própria notificação, o usuário adia o aviso em 1 hora ou abre o dia do evento na agenda.
 - **Conta:** cadastro, login, recuperação de senha por código, tema claro ou escuro e exclusão da conta com todos os dados.
 
 ## Checklist da entrega
@@ -41,7 +41,7 @@ Entrega em 17/11, com apresentação em 17 ou 24/11. Um item só é marcado quan
 - [x] Requisição a web service: autenticação, banco e storage do Supabase via HTTPS
 - [x] Requisição a uma API pública: feriados nacionais da BrasilAPI na Agenda
 - [x] Persistência de dados: PostgreSQL no Supabase e preferências no aparelho com AsyncStorage
-- [x] Notificação: lembretes locais antes de provas e trabalhos, com os botões "Adiar 1 hora" e "Ver na agenda"
+- [x] Notificação: lembretes locais antes e na hora de provas e trabalhos, com os botões "Adiar 1 hora" e "Ver na agenda"
 - [x] Finalidade além de mostrar informações: o usuário cadastra matérias, conteúdos, tarefas e eventos
 - [x] Não é app de consulta de filmes ou livros
 - [ ] Todos os tópicos vistos em sala até a apresentação, conferidos com os slides da disciplina
@@ -96,7 +96,7 @@ O app não tem backend próprio: ele conversa direto com o Supabase. Decisões p
 
 - **Segurança no banco:** a chave do Supabase que vai dentro do app é pública por definição. Quem impede um usuário de ler ou alterar dados de outro são as políticas de RLS, presentes em todas as tabelas. O schema completo está em [`supabase/schema.sql`](supabase/schema.sql).
 - **Dados em um só lugar:** matérias, conteúdos, tarefas e eventos são carregados uma vez no `DataContext` e as telas derivam o que precisam deles; cada escrita vai primeiro ao Supabase e depois atualiza as listas locais (marcar tarefa e mudar status de conteúdo são otimistas, com rollback em caso de erro).
-- **Lembretes locais:** não há servidor de push. O `DataContext` mantém as notificações agendadas no aparelho (`expo-notifications`) alinhadas aos eventos e às preferências do perfil: a cada mudança, cancela os avisos agendados e agenda de novo os próximos (no máximo 60, porque o iOS limita as notificações locais pendentes a 64). Prova usa as preferências de prova; trabalho, atividade e outros usam as de trabalho. O horário do aviso é `dia do evento − antecedência` no horário escolhido. Os botões da notificação abrem o app: "Adiar 1 hora" agenda uma cópia do aviso (que a sincronização não apaga) e "Ver na agenda", assim como o toque na notificação, abre a Agenda no dia do evento (`useReminderResponses`).
+- **Lembretes locais:** não há servidor de push. O `DataContext` mantém as notificações agendadas no aparelho (`expo-notifications`) alinhadas aos eventos e às preferências do perfil: a cada mudança, cancela os avisos agendados e agenda de novo os próximos (no máximo 60, porque o iOS limita as notificações locais pendentes a 64). Prova usa as preferências de prova; trabalho, atividade e outros usam as de trabalho. Cada evento tem dois avisos: o antecipado, em `dia do evento − antecedência` no horário escolhido (ignorado se cairia depois do início), e o da hora do evento, só com o botão "Ver na agenda". Os botões da notificação abrem o app: "Adiar 1 hora" agenda uma cópia do aviso (que a sincronização não apaga) e "Ver na agenda", assim como o toque na notificação, abre a Agenda no dia do evento (`useReminderResponses`).
 - **Feriados:** a BrasilAPI é consultada uma vez por ano e a resposta fica em memória e no AsyncStorage; sem internet, a agenda funciona sem os feriados.
 - **Sessão em um só lugar:** login, cadastro e recuperação de senha ficam no `AuthContext`; as telas não acessam `supabase.auth` diretamente. O `RootNavigator` alterna entre o fluxo de acesso e o app conforme a sessão, então entrar e sair não depende de `navigate()`.
 - **Recuperação por código:** a senha é redefinida com o código de 6 dígitos enviado por e-mail, não pelo link. O link precisaria reabrir o app por deep link, e no Expo Go esse endereço muda junto com o servidor de desenvolvimento.
