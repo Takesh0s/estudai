@@ -49,7 +49,7 @@ function ReminderCard({ title, description, draft, onChange }: ReminderCardProps
       {draft.enabled ? (
         <>
           <StepSlider
-            label="Avisar"
+            label="Aviso antecipado"
             value={draft.days}
             min={0}
             max={MAX_DAYS_BEFORE}
@@ -57,7 +57,7 @@ function ReminderCard({ title, description, draft, onChange }: ReminderCardProps
             onChange={(days) => onChange({ ...draft, days })}
           />
           <DateTimeField
-            label="Horário do aviso"
+            label="Horário do aviso antecipado"
             mode="time"
             value={draft.time}
             onChange={(time) => onChange({ ...draft, time })}
@@ -125,8 +125,8 @@ export function RemindersScreen({ navigation }: AppScreenProps<'Reminders'>) {
             Lembretes
           </AppText>
           <AppText tone="secondary">
-            Escolha quando o Estudaí avisa sobre as datas da agenda. O aviso chega mesmo com o app
-            fechado.
+            O Estudaí avisa na hora de cada evento e também antes, no dia e no horário que você
+            escolher aqui. Os avisos chegam mesmo com o app fechado.
           </AppText>
         </View>
 
