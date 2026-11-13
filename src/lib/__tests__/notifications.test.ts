@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 import { makeEvent, makeProfile, makeSubject } from '../../test/factories';
 import {
@@ -222,6 +223,19 @@ describe('syncReminders', () => {
     mocked.setNotificationCategoryAsync.mockRejectedValueOnce(new Error('categories unavailable'));
     await syncReminders([makeEvent({ id: 'p1', starts_at: at(20, 9) })], [], makeProfile());
     expect(scheduledIds()).toEqual(['event-p1', 'event-p1-start']);
+  });
+
+  it('falls back to the default Android channel when a channel cannot be created', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mocked.setNotificationChannelAsync.mockRejectedValue(new Error('NullPointerException'));
+
+    await syncReminders([makeEvent({ id: 'p1', starts_at: at(20, 9) })], [], makeProfile());
+
+    expect(scheduledIds()).toEqual(['event-p1', 'event-p1-start']);
+    const [request] = mocked.scheduleNotificationAsync.mock.calls[0];
+    expect(request.trigger).not.toHaveProperty('channelId');
+    mocked.setNotificationChannelAsync.mockReset();
   });
 
   it('uses the high-priority channel when the profile asks for it', async () => {

@@ -107,17 +107,26 @@ async function ensureCategory() {
   await Notifications.setNotificationCategoryAsync(START_CATEGORY, [open]);
 }
 
+// Android channels created so far. A reminder only names a channel that exists;
+// otherwise Android shows it on the default one rather than dropping it.
+const readyChannels = new Set<string>();
+
 async function ensureChannels() {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(CHANNEL_DEFAULT, {
-    name: 'Lembretes',
-    importance: AndroidImportance.DEFAULT,
-  });
-  await Notifications.setNotificationChannelAsync(CHANNEL_HIGH, {
-    name: 'Lembretes (prioridade alta)',
-    importance: AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-  });
+  const channels: [string, Notifications.NotificationChannelInput][] = [
+    [CHANNEL_DEFAULT, { name: 'Lembretes', importance: AndroidImportance.DEFAULT }],
+    [CHANNEL_HIGH, { name: 'Lembretes (prioridade alta)', importance: AndroidImportance.MAX, enableVibrate: true }],
+  ];
+  for (const [id, options] of channels) {
+    try {
+      await Notifications.setNotificationChannelAsync(id, options);
+      readyChannels.add(id);
+    } catch (error) {
+      // Expo Go 58 on Android rejects this call on some devices; the reminders
+      // must still go out, so they fall back to the default channel.
+      console.warn(`[reminders] could not create the "${id}" notification channel`, error);
+    }
+  }
 }
 
 /** When the event happens, worded from the moment the notification is shown. */
@@ -149,8 +158,10 @@ function reminderContent(
   };
 }
 
-function channelFor(profile: Profile | null) {
-  return profile?.high_priority_notifications ? CHANNEL_HIGH : CHANNEL_DEFAULT;
+/** Trigger fields that pick the channel for `profile`, empty when that channel could not be created. */
+function channelFor(profile: Profile | null): { channelId?: string } {
+  const id = profile?.high_priority_notifications ? CHANNEL_HIGH : CHANNEL_DEFAULT;
+  return Platform.OS !== 'android' || readyChannels.has(id) ? { channelId: id } : {};
 }
 
 async function cancelScheduledReminders() {
@@ -211,7 +222,7 @@ export function syncReminders(
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: when,
-            channelId: channelFor(profile),
+            ...channelFor(profile),
           },
         });
       }
@@ -235,20 +246,24 @@ export async function sendTestReminder(profile: Profile | null): Promise<TestRem
   await ensureChannels();
   await ensureCategory().catch(() => {});
 
-  const channelId = channelFor(profile);
+  const channel = channelFor(profile);
   const content: Notifications.NotificationContentInput = {
     title: 'Lembrete de teste',
     body: 'É assim que o Estudaí avisa das suas provas e trabalhos.',
     categoryIdentifier: REMINDER_CATEGORY,
   };
-  await Notifications.scheduleNotificationAsync({ identifier: 'test-now', content, trigger: { channelId } });
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'test-now',
+    content,
+    trigger: channel.channelId ? { channelId: channel.channelId } : null,
+  });
   await Notifications.scheduleNotificationAsync({
     identifier: 'test-later',
     content: { ...content, body: 'Este chegou 10 segundos depois: os avisos agendados estão funcionando.' },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: new Date(Date.now() + 10_000),
-      channelId,
+      ...channel,
     },
   });
 
@@ -275,7 +290,7 @@ export async function snoozeReminder(
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: when,
-      channelId: channelFor(profile),
+      ...channelFor(profile),
     },
   });
   return when;
