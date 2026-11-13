@@ -7,6 +7,8 @@ import {
   hasActiveReminder,
   REMINDER_CATEGORY,
   reminderDate,
+  START_CATEGORY,
+  startReminderDate,
   reminderEventId,
   snoozeReminder,
   syncReminders,
@@ -81,6 +83,27 @@ describe('reminderDate', () => {
   it('returns null when the reminder is off', () => {
     expect(reminderDate(makeEvent({ reminder_enabled: false }), makeProfile(), now)).toBeNull();
   });
+
+  it('returns null when it would only fire after the event has started', () => {
+    // Same day at 13:05 for an exam at 09:00.
+    const profile = makeProfile({ exam_reminder_days_before: 0, exam_reminder_time: '13:05:00' });
+    expect(reminderDate(makeEvent({ starts_at: at(12, 9) }), profile, now)).toBeNull();
+  });
+});
+
+describe('startReminderDate', () => {
+  it('fires when the event starts', () => {
+    expect(startReminderDate(makeEvent({ starts_at: at(11, 10, 30) }), makeProfile(), now)).toEqual(
+      new Date(2026, 10, 11, 10, 30),
+    );
+  });
+
+  it('returns null for events that already started or have the reminder off', () => {
+    expect(startReminderDate(makeEvent({ starts_at: at(11, 9) }), makeProfile(), now)).toBeNull();
+    expect(startReminderDate(makeEvent({ starts_at: at(20, 9), reminder_enabled: false }), makeProfile(), now)).toBeNull();
+    const profile = makeProfile({ exam_reminder_enabled: false });
+    expect(startReminderDate(makeEvent({ type: 'prova', starts_at: at(20, 9) }), profile, now)).toBeNull();
+  });
 });
 
 describe('syncReminders', () => {
@@ -114,6 +137,9 @@ describe('syncReminders', () => {
       { identifier: ACTION_SNOOZE, buttonTitle: 'Adiar 1 hora', options: { opensAppToForeground: true } },
       { identifier: ACTION_OPEN, buttonTitle: 'Ver na agenda', options: { opensAppToForeground: true } },
     ]);
+    expect(mocked.setNotificationCategoryAsync).toHaveBeenCalledWith(START_CATEGORY, [
+      { identifier: ACTION_OPEN, buttonTitle: 'Ver na agenda', options: { opensAppToForeground: true } },
+    ]);
   });
 
   it('schedules nothing without notification permission', async () => {
@@ -123,7 +149,7 @@ describe('syncReminders', () => {
     expect(mocked.scheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
-  it('schedules each upcoming reminder with a readable message', async () => {
+  it('schedules an advance reminder and one at the event time, with readable messages', async () => {
     const subject = makeSubject({ id: 'calc', name: 'Cálculo' });
     await syncReminders(
       [makeEvent({ id: 'p1', title: 'P1', subject_id: 'calc', starts_at: at(20, 9) })],
@@ -131,7 +157,17 @@ describe('syncReminders', () => {
       makeProfile(),
     );
 
-    expect(mocked.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(mocked.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+    expect(mocked.scheduleNotificationAsync).toHaveBeenCalledWith({
+      identifier: 'event-p1-start',
+      content: {
+        title: 'Prova: P1',
+        body: 'Agora, às 09:00 · Cálculo',
+        categoryIdentifier: START_CATEGORY,
+        data: { eventId: 'p1' },
+      },
+      trigger: { type: 'date', date: new Date(2026, 10, 20, 9, 0), channelId: 'lembretes' },
+    });
     expect(mocked.scheduleNotificationAsync).toHaveBeenCalledWith({
       identifier: 'event-p1',
       content: {
@@ -159,7 +195,9 @@ describe('syncReminders', () => {
       profile,
     );
 
-    const bodies = mocked.scheduleNotificationAsync.mock.calls.map(([request]) => request.content.body);
+    const bodies = mocked.scheduleNotificationAsync.mock.calls
+      .filter(([request]) => !request.identifier?.endsWith('-start'))
+      .map(([request]) => request.content.body);
     expect(bodies).toEqual(['Hoje às 09:00', 'Em 3 dias, Sex, 20 de nov às 23:59']);
   });
 
@@ -175,7 +213,7 @@ describe('syncReminders', () => {
       makeProfile(),
     );
 
-    expect(scheduledIds()).toEqual(['event-sooner', 'event-later']);
+    expect(scheduledIds()).toEqual(['event-sooner', 'event-sooner-start', 'event-later', 'event-later-start']);
   });
 
   it('uses the high-priority channel when the profile asks for it', async () => {
@@ -208,7 +246,7 @@ describe('syncReminders', () => {
       syncReminders([makeEvent({ id: 'b', starts_at: at(20, 9) })], [], makeProfile()),
     ]);
 
-    expect(order).toEqual(['cancel', 'event-a', 'cancel', 'event-b']);
+    expect(order).toEqual(['cancel', 'event-a', 'event-a-start', 'cancel', 'event-b', 'event-b-start']);
   });
 });
 
