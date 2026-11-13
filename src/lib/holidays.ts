@@ -1,17 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useState } from 'react';
+
+import { readStoredHolidays, saveHolidays } from './holidayStore';
 
 /** Shape returned by https://brasilapi.com.br/api/feriados/v1/{year}. */
 export type Holiday = { date: string; name: string; type: string };
 
-const cacheKey = (year: number) => `@estudai/holidays-${year}`;
 const memory = new Map<number, Holiday[]>();
 const inFlight = new Map<number, Promise<Holiday[]>>();
 
 async function readStored(year: number): Promise<Holiday[] | null> {
   try {
-    const raw = await AsyncStorage.getItem(cacheKey(year));
-    return raw ? (JSON.parse(raw) as Holiday[]) : null;
+    return await readStoredHolidays(year);
   } catch {
     return null;
   }
@@ -26,7 +25,7 @@ async function download(year: number): Promise<Holiday[]> {
     });
     if (!response.ok) throw new Error(`BrasilAPI responded ${response.status}`);
     const data = (await response.json()) as Holiday[];
-    AsyncStorage.setItem(cacheKey(year), JSON.stringify(data)).catch(() => {});
+    saveHolidays(year, data).catch(() => {});
     return data;
   } finally {
     clearTimeout(timeout);
@@ -35,8 +34,9 @@ async function download(year: number): Promise<Holiday[]> {
 
 /**
  * National holidays never change once published, so a year is downloaded once
- * and then served from memory and AsyncStorage. When the request fails the
- * agenda keeps working without holidays instead of showing an error.
+ * and then served from memory and from a SQLite table on the device. When the
+ * request fails the agenda keeps working without holidays instead of showing
+ * an error.
  */
 export function loadHolidays(year: number): Promise<Holiday[]> {
   const cached = memory.get(year);
