@@ -14,7 +14,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { dateToTimeString, timeStringToDate } from '../../lib/dates';
 import { daysBeforeLabel } from '../../lib/labels';
-import { ensureNotificationPermission } from '../../lib/notifications';
+import { ensureNotificationPermission, sendTestReminder } from '../../lib/notifications';
 import type { AppScreenProps } from '../../navigation/types';
 import { spacing } from '../../theme';
 
@@ -84,6 +84,29 @@ export function RemindersScreen({ navigation }: AppScreenProps<'Reminders'>) {
   const [highPriority, setHighPriority] = useState(profile?.high_priority_notifications ?? false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  async function handleTest() {
+    setTesting(true);
+    try {
+      const { granted, upcoming } = await sendTestReminder(profile);
+      if (!granted) {
+        Alert.alert(
+          'Notificações desativadas',
+          'O aparelho não deixou o Estudaí enviar notificações. Ative nas configurações do sistema e tente de novo.',
+        );
+      } else {
+        Alert.alert(
+          'Teste enviado',
+          `Um aviso aparece agora e outro em 10 segundos. Lembretes de eventos agendados no aparelho: ${upcoming}.`,
+        );
+      }
+    } catch (error) {
+      Alert.alert('O teste falhou', error instanceof Error ? error.message : String(error));
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function handleSave() {
     setFormError(null);
@@ -160,6 +183,12 @@ export function RemindersScreen({ navigation }: AppScreenProps<'Reminders'>) {
         <Notice message="Cada evento também tem o próprio botão de lembrete: se ele estiver desligado, nenhum aviso é enviado, mesmo com o tipo ativado aqui." />
         {formError ? <Notice tone="error" message={formError} /> : null}
         <Button label="Salvar" onPress={handleSave} loading={saving} />
+        <Button
+          label="Enviar lembrete de teste"
+          variant="outline"
+          onPress={handleTest}
+          loading={testing}
+        />
       </View>
     </Screen>
   );

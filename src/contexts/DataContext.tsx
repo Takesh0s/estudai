@@ -133,11 +133,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // reminder preferences. Runs on sign out too (empty lists), which cancels them.
   useEffect(() => {
     if (loading) return;
-    syncReminders(events, subjects, profile).catch(() => {});
+    const sync = () =>
+      syncReminders(events, subjects, profile).catch((error) => {
+        console.warn('[reminders] could not schedule the reminders', error);
+      });
+    sync();
     // Notifications may be turned on in the system settings while the app is in
     // the background, so reschedule whenever it comes back to the foreground.
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') syncReminders(events, subjects, profile).catch(() => {});
+      if (state === 'active') sync();
     });
     return () => subscription.remove();
   }, [loading, events, subjects, profile]);

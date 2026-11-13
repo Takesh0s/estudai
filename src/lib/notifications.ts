@@ -187,7 +187,12 @@ export function syncReminders(
       const permission = await Notifications.getPermissionsAsync();
       if (!permission.granted) return;
       await ensureChannels();
-      await ensureCategory();
+      try {
+        await ensureCategory();
+      } catch (error) {
+        // Without the buttons the reminders still work, so never skip scheduling over it.
+        console.warn('[reminders] could not register the notification buttons', error);
+      }
 
       const now = new Date();
       const due = events
@@ -212,6 +217,44 @@ export function syncReminders(
       }
     });
   return queue;
+}
+
+/** Result of sendTestReminder, shown to the user so they can tell what is failing. */
+export type TestReminderResult = { granted: boolean; upcoming: number };
+
+/**
+ * Shows a sample reminder right away and another in 10 seconds through the same
+ * channel and buttons as the real ones. The first checks that notifications are
+ * displayed; the second, that scheduled ones fire. Also reports how many event
+ * reminders are scheduled on the device.
+ */
+export async function sendTestReminder(profile: Profile | null): Promise<TestReminderResult> {
+  if (!isSupported) return { granted: false, upcoming: 0 };
+  const granted = await ensureNotificationPermission();
+  if (!granted) return { granted, upcoming: 0 };
+  await ensureChannels();
+  await ensureCategory().catch(() => {});
+
+  const channelId = channelFor(profile);
+  const content: Notifications.NotificationContentInput = {
+    title: 'Lembrete de teste',
+    body: 'É assim que o Estudaí avisa das suas provas e trabalhos.',
+    categoryIdentifier: REMINDER_CATEGORY,
+  };
+  await Notifications.scheduleNotificationAsync({ identifier: 'test-now', content, trigger: { channelId } });
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'test-later',
+    content: { ...content, body: 'Este chegou 10 segundos depois: os avisos agendados estão funcionando.' },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(Date.now() + 10_000),
+      channelId,
+    },
+  });
+
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const upcoming = scheduled.filter((request) => request.identifier.startsWith(REMINDER_PREFIX)).length;
+  return { granted, upcoming };
 }
 
 /**

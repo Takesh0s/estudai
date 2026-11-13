@@ -10,6 +10,7 @@ import {
   START_CATEGORY,
   startReminderDate,
   reminderEventId,
+  sendTestReminder,
   snoozeReminder,
   syncReminders,
 } from '../notifications';
@@ -216,6 +217,13 @@ describe('syncReminders', () => {
     expect(scheduledIds()).toEqual(['event-sooner', 'event-sooner-start', 'event-later', 'event-later-start']);
   });
 
+  it('still schedules when the buttons cannot be registered', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mocked.setNotificationCategoryAsync.mockRejectedValueOnce(new Error('categories unavailable'));
+    await syncReminders([makeEvent({ id: 'p1', starts_at: at(20, 9) })], [], makeProfile());
+    expect(scheduledIds()).toEqual(['event-p1', 'event-p1-start']);
+  });
+
   it('uses the high-priority channel when the profile asks for it', async () => {
     await syncReminders([makeEvent({ starts_at: at(20, 9) })], [], makeProfile({ high_priority_notifications: true }));
     const [request] = mocked.scheduleNotificationAsync.mock.calls[0];
@@ -301,5 +309,29 @@ describe('reminderEventId', () => {
     expect(reminderEventId(response({}))).toBeNull();
     expect(reminderEventId(response(null))).toBeNull();
     expect(reminderEventId(response({ eventId: 42 }))).toBeNull();
+  });
+});
+
+describe('sendTestReminder', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mocked.getPermissionsAsync.mockResolvedValue({ granted: true } as never);
+  });
+
+  it('shows one reminder now and schedules another, reporting the pending event reminders', async () => {
+    mocked.getAllScheduledNotificationsAsync.mockResolvedValue(
+      [{ identifier: 'event-a' }, { identifier: 'event-a-start' }, { identifier: 'test-later' }] as never,
+    );
+    await expect(sendTestReminder(makeProfile())).resolves.toEqual({ granted: true, upcoming: 2 });
+
+    const [now, later] = mocked.scheduleNotificationAsync.mock.calls.map(([request]) => request);
+    expect(now.trigger).toEqual({ channelId: 'lembretes' });
+    expect(later.trigger).toEqual(expect.objectContaining({ type: 'date', channelId: 'lembretes' }));
+  });
+
+  it('sends nothing without permission', async () => {
+    mocked.getPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false } as never);
+    await expect(sendTestReminder(makeProfile())).resolves.toEqual({ granted: false, upcoming: 0 });
+    expect(mocked.scheduleNotificationAsync).not.toHaveBeenCalled();
   });
 });
