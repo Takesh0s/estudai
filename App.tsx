@@ -8,17 +8,15 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
 import { SetupRequiredScreen } from './src/screens/SetupRequiredScreen';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { DataProvider } from './src/contexts/DataContext';
 import { isSupabaseConfigured } from './src/lib/supabase';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from './src/theme';
-
 // Keeps the native splash up until fonts and the stored session are ready,
 // so the first frame never renders with fallback fonts or the wrong navigator.
 SplashScreen.preventAutoHideAsync().catch(() => {});
-
 function AppContent() {
   const { scheme } = useTheme();
   const { initializing } = useAuth();
@@ -28,15 +26,11 @@ function AppContent() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
-
   const ready = (fontsLoaded || Boolean(fontError)) && !initializing;
-
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
-
   if (!ready) return null;
-
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
@@ -44,14 +38,15 @@ function AppContent() {
     </>
   );
 }
-
 export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         {isSupabaseConfigured ? (
           <AuthProvider>
-            <AppContent />
+            <DataProvider>
+              <AppContent />
+            </DataProvider>
           </AuthProvider>
         ) : (
           <SetupRequiredScreen />

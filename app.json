@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "estudai",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F2EEE4",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "br.ucb.estudai"
@@ -38,7 +39,21 @@
             "backgroundColor": "#121714"
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#1B7A43"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Estudaí usa suas fotos para você escolher a foto de perfil."
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite"
     ]
   }
 }
