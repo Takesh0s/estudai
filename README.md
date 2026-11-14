@@ -207,7 +207,7 @@ Os testes ficam em pastas `__tests__`, ao lado do código que testam:
 | --- | --- |
 | `src/lib/__tests__` | Datas e calendário, agrupamento e urgência de eventos, rótulos, mensagens de erro do login, cache dos feriados da BrasilAPI em SQLite, sessão no SecureStore, agendamento e adiamento dos lembretes |
 | `src/navigation/__tests__` | Resposta aos botões da notificação: adiar, abrir a agenda no dia do evento e tratar cada toque uma vez só |
-| `src/components/ui/__tests__` | Botão, campo de texto, checkbox, diálogo de confirmação, estado vazio, chip, seletor de cor, slider, barra de progresso e linha de configuração |
+| `src/components/ui/__tests__` | Avatar, botão, campo de texto, checkbox, diálogo de confirmação, estado vazio, chip, seletor de cor, slider, barra de progresso e linha de configuração |
 | `src/theme/__tests__` | Troca de tema e preferência salva no aparelho |
 
 Rede e notificações são simuladas, então os testes não dependem de internet nem de celular.
