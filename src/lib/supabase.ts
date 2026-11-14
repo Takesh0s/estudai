@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
 import type { Database } from './database.types';
+import { secureSessionStorage } from './secureStorage';
 
 // The publishable key is meant to ship inside the app. Data access is enforced
 // by the row level security policies in supabase/schema.sql, not by the key.
@@ -18,7 +18,8 @@ export const supabase = createClient<Database>(
   isSupabaseConfigured ? supabaseKey : 'placeholder',
   {
     auth: {
-      storage: AsyncStorage,
+      // Tokens are credentials: kept in SecureStore, not in plain AsyncStorage.
+      storage: secureSessionStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

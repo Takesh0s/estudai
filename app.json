@@ -51,7 +51,9 @@
         {
           "photosPermission": "O Estudaí usa suas fotos para você escolher a foto de perfil."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sqlite"
     ]
   }
 }
